@@ -17,7 +17,7 @@ const records = [];
 
 const getRecordStatus = (result) => result.passed ? "Pass" : result.warning ? "Warn" : "Fail";
 
-const generateResults = (url, response) => {
+const generateResults = (url, status, response) => {
     const displayURL = url.replace("https://www.themuse.com", "").split("?")[0];
     const err = response.error || [];
     const warn = response.warnings || [];
@@ -25,7 +25,7 @@ const generateResults = (url, response) => {
     const payload = [ err, ...warn, ...pass ];
     let cleanResult = {
         URL: displayURL,
-        URL_STATUS: getFileStatus(response),
+        URL_STATUS: status > 399 ? status : getFileStatus(response),
     };
 
     if (header.length === 2) {
@@ -48,7 +48,7 @@ const generateResults = (url, response) => {
     }
 
     payload.forEach((item, index) => {
-        if (index > 0) {
+        if (index > 0 && status <= 403) {
             const name = `Name_${index}`;
             const status = `Status_${index}`;
             const note = `Note_${index}`;
@@ -64,16 +64,16 @@ const generateResults = (url, response) => {
     console.log("writing", displayURL);
 }
 
-const test = (url, html) => {
-    structuredDataTest(html, { presets: [ presets.Google, presets.SocialMedia ]})
+const test = (url, status, html) => {
+    structuredDataTest(html, { presets: [ presets.Google, presets.SocialMedia ]}) 
     .then(res => {
         // If you end up here, then there were no errors
-        generateResults(url, res);
+        generateResults(url, status, res);
     })
     .catch(err => {
         // If any test fails, the promise is rejected
         if (err.type === 'VALIDATION_FAILED') {
-            generateResults(url, err.res);
+            generateResults(url, status, err.res);
         } else {
             // Handle other errors here (e.g. an error fetching a URL)
             console.log(err)
@@ -84,9 +84,13 @@ const test = (url, html) => {
 const getData = async url => {
     try {
         const response = await axios.get(`${url}?_tc_test=1&bust=2020`);
-        test(url, response.data);
+        test(url, response.status, response.data);
+        console.log("STATUS", response.status);
+        return;
     } catch (error) {
-        console.log(error);
+        test(url, error.response.status || "???", `<!DOCTYPE html><html lang="en"><head></head><body></body></html>`);
+        console.log("STATUS", error.response.status || "???");
+        return;
     }
 };
 
